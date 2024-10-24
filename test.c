@@ -7,26 +7,23 @@ typedef struct Time
     int min;
 } Time;
 
-typedef struct AVLFlightTag
+typedef struct FlightScheduleTag
 {
     int flightId;
     Time departureTime;
-    Time ETA;
-    struct AVLFlightTag *left;
-    struct AVLFlightTag *right;
-    int FlightHeight;
-} AVLFlightSchedule;
+    Time eta;
+    struct FlightScheduleTag *next;
 
-typedef struct AVLBucketTag
+} FlightSchedule;
+
+typedef struct BucketTag
 {
     int bucketId;
     Time etaStart;
     Time etaEnd;
-    AVLFlightSchedule *FlightSchedule;
-    struct AVLBucketTag *left;
-    struct AVLBucketTag *right;
-    int BucketHeight;
-} AVLBucket;
+    FlightSchedule *flightSchedule;
+    struct BucketTag *next;
+} Bucket;
 
 int timeDiff(Time a, Time b)
 {
@@ -52,348 +49,170 @@ int maxTime(Time a, Time b)
     }
 }
 
-int max(int a, int b)
-{
-    int ret_val = a;
-    if (a < b)
-        ret_val = b;
-    return ret_val;
-}
+Bucket *createBucket(int bucketId, Time etaStart, Time etaEnd);
+FlightSchedule *createFlightSchedule(int flightId, Time departureTime, Time eta);
+void Print(Bucket *bucket);
+void showStatus(Bucket *buketList, int flightId);
+void insertFlightPlan(Bucket **bucketList, int flightId, Time departureTime, Time ETA);
+Bucket *insertBucket(Bucket *bucketList, Bucket *newBucket);
+void deleteFlightPlan(Bucket **bucketList, int flightId);
+void reArrangeBucket(Bucket **bucket, Time t);
 
-AVLBucket *createBucket(int bucketId, Time etaStart, Time etaEnd);
-AVLFlightSchedule *createFlightSchedule(int flightId, Time departureTime, Time eta);
-void Print(AVLBucket *bucket);
-int showStatus(AVLBucket *buketList, int flightId);
-void insertFlightPlan(AVLBucket **bucketList, int flightId, Time departureTime, Time ETA);
-AVLBucket *insertBucket(AVLBucket *bucketList, AVLBucket *newBucket);
-AVLBucket* deleteFlightPlan(AVLBucket *bucketList, int flightId, Time DepartureTime);
-
-AVLBucket *createBucket(int bucketId, Time etaStart, Time etaEnd)
+Bucket *createBucket(int bucketId, Time etaStart, Time etaEnd)
 {
-    AVLBucket *newBucket = (AVLBucket *)malloc(sizeof(AVLBucket));
+    Bucket *newBucket = (Bucket *)malloc(sizeof(Bucket));
     newBucket->bucketId = bucketId;
     newBucket->etaStart = etaStart;
     newBucket->etaEnd = etaEnd;
-    newBucket->FlightSchedule = NULL;
-    newBucket->left = NULL;
-    newBucket->right = NULL;
-    newBucket->BucketHeight = 1;
+    newBucket->flightSchedule = NULL;
+    newBucket->next = NULL;
     return newBucket;
 }
 
-AVLFlightSchedule *createFlightSchedule(int flightId, Time departureTime, Time eta)
+FlightSchedule *createFlightSchedule(int flightId, Time departureTime, Time eta)
 {
-    AVLFlightSchedule *newFlight = (AVLFlightSchedule *)malloc(sizeof(AVLFlightSchedule));
-    newFlight->flightId = flightId;
-    newFlight->departureTime = departureTime;
-    newFlight->ETA = eta;
-    newFlight->left = NULL;
-    newFlight->right = NULL;
-    newFlight->FlightHeight = 1;
-    return newFlight;
+    FlightSchedule *newSchedule = (FlightSchedule *)malloc(sizeof(FlightSchedule));
+    newSchedule->flightId = flightId;
+    newSchedule->departureTime = departureTime;
+    newSchedule->eta = eta;
+    newSchedule->next = NULL;
+    return newSchedule;
 }
 
-void PrintFlightSchedule(AVLFlightSchedule *flight)
+int liesBetween(Time etaStart, Time etaEnd, Time GivenETA)
 {
-    if (flight != NULL)
+    int ans = 0;
+    // if(etaEnd.hrs == 0) etaEnd.hrs = 24 ;
+    if (timeDiff(GivenETA, etaStart) >= 0 && timeDiff(GivenETA, etaStart) < 60 && timeDiff(etaEnd, GivenETA) >= 0 && timeDiff(etaEnd, GivenETA) < 60)
     {
-        PrintFlightSchedule(flight->left);
-        printf("Flight Id: %d\n", flight->flightId);
-        printf("Departure Time: %d:%d\n", flight->departureTime.hrs, flight->departureTime.min);
-        printf("ETA: %d:%d\n", flight->ETA.hrs, flight->ETA.min);
-        PrintFlightSchedule(flight->right);
+        ans = 1;
     }
+    return ans;
 }
 
-void Print(AVLBucket *bucket)
+void Print(Bucket *bucket)
 {
-    if (bucket != NULL)
+    Bucket *temp = bucket;
+    while (temp)
     {
-        Print(bucket->left);
-        printf("Bucket %d\n", bucket->bucketId);
-        printf("ETA Start: %d:%d\n", bucket->etaStart.hrs, bucket->etaStart.min);
-        printf("ETA End: %d:%d\n", bucket->etaEnd.hrs, bucket->etaEnd.min);
-        PrintFlightSchedule(bucket->FlightSchedule);
         printf("\n");
-        Print(bucket->right);
-    }
-}
-
-int searchFlight(AVLFlightSchedule *flight, int flightID)
-{   int ans = 0 ;
-    int flag = 0 ;
-    if (flight != NULL && flag == 0)
-    {
-        if (flight->flightId == flightID)
+        printf("Bucket Id: %d\n", temp->bucketId);
+        printf("ETA Start: %d:%d\n", temp->etaStart.hrs, temp->etaStart.min);
+        printf("ETA End: %d:%d\n", temp->etaEnd.hrs, temp->etaEnd.min);
+        FlightSchedule *temp2 = temp->flightSchedule;
+        while (temp2)
         {
-            printf("Flight %d\n", flight->flightId);
-            printf("Departure Time: %d:%d\n", flight->departureTime.hrs, flight->departureTime.min);
-            printf("ETA: %d:%d\n", flight->ETA.hrs, flight->ETA.min);
-            ans = 1;
-            flag = 1;
+            printf("Flight Id: %d\n", temp2->flightId);
+            printf("Departure Time: %d:%d\n", temp2->departureTime.hrs, temp2->departureTime.min);
+            printf("ETA: %d:%d\n", temp2->eta.hrs, temp2->eta.min);
+            temp2 = temp2->next;
         }
-        searchFlight(flight->left, flightID);
-        searchFlight(flight->right, flightID);
+        temp = temp->next;
+        printf("\n");
     }
-    return ans;
 }
 
-int showStatus(AVLBucket *bucketList, int flightId)
-{   int ans = 0 ;
-    if (bucketList != NULL)
+void showStatus(Bucket *bucketList, int flightId)
+{
+    Bucket *temp = bucketList;
+    int flag = 1;
+    while (temp && flag)
     {
-        showStatus(bucketList->left, flightId);
-        ans = searchFlight(bucketList->FlightSchedule, flightId);
-        if(ans) return ans;
-        showStatus(bucketList->right, flightId);
+        FlightSchedule *temp2 = temp->flightSchedule;
+        while (temp2 && flag)
+        {
+            if (temp2->flightId == flightId)
+            {
+                printf("Flight Id: %d\n", temp2->flightId);
+                printf("Departure Time: %d:%d\n", temp2->departureTime.hrs, temp2->departureTime.min);
+                printf("ETA: %d:%d\n", temp2->eta.hrs, temp2->eta.min);
+                flag = 0;
+            }
+            temp2 = temp2->next;
+        }
+        temp = temp->next;
     }
-    return ans;
-}
-
-int flightTreeHegiht(AVLFlightSchedule *Flight)
-{
-    int ans = 0;
-    if (Flight != NULL)
+    if (flag)
     {
-        ans = Flight->FlightHeight;
+        printf("Flight Id %d does not exist\n", flightId);
     }
-    return ans;
+    printf("\n");
+    return;
 }
 
-int bucketTreeHeight(AVLBucket *bucket)
+Bucket *insertBucket(Bucket *bucketList, Bucket *newBucket)
 {
-    int ans = 0;
-    if (bucket != NULL)
-    {
-        ans = bucket->BucketHeight;
-    }
-    return ans;
-}
 
-AVLBucket *leftRotateBucket(AVLBucket *bucket)
-{
-    AVLBucket *bucketRight = bucket->right;
-    AVLBucket *bucketRightLeft = bucketRight->left;
-
-    bucketRight->left = bucket;
-    bucket->right = bucketRightLeft;
-
-    bucket->BucketHeight = max(bucketTreeHeight(bucket->left), bucketTreeHeight(bucket->right)) + 1;
-    bucketRight->BucketHeight = max(bucketTreeHeight(bucketRight->left), bucketTreeHeight(bucketRight->right)) + 1;
-
-    return bucketRight;
-}
-
-AVLBucket *rightRotateBucket(AVLBucket *bucket)
-{
-    AVLBucket *bucketLeft = bucket->left;
-    AVLBucket *bucketLeftRight = bucketLeft->right;
-
-    bucketLeft->right = bucket;
-    bucket->left = bucketLeftRight;
-
-    bucket->BucketHeight = max(bucketTreeHeight(bucket->left), bucketTreeHeight(bucket->right)) + 1;
-    bucketLeft->BucketHeight = max(bucketTreeHeight(bucketLeft->left), bucketTreeHeight(bucketLeft->right)) + 1;
-
-    return bucketLeft;
-}
-
-int balanceBucket(AVLBucket *bucket)
-{
-    int ans = 0;
-    if (bucket != NULL)
-    {
-        ans = bucketTreeHeight(bucket->left) - bucketTreeHeight(bucket->right);
-    }
-    return ans;
-}
-
-AVLBucket *insertBucket(AVLBucket *bucketList, AVLBucket *newBucket)
-{
     if (bucketList == NULL)
     {
         bucketList = newBucket;
-        return bucketList;
     }
-
-    if (maxTime(bucketList->etaStart, newBucket->etaEnd) == 1)
+    else if (bucketList->etaStart.hrs > newBucket->etaEnd.hrs)
     {
-        bucketList->left = insertBucket(bucketList->left, newBucket);
+        newBucket->next = bucketList;
+        bucketList = newBucket;
     }
-    else if (maxTime(newBucket->etaStart, bucketList->etaEnd) == 1)
+    else
     {
-        bucketList->right = insertBucket(bucketList->right, newBucket);
+        Bucket *temp = bucketList;
+        Bucket *prev;
+        int flag = 1;
+        while (temp && flag)
+        {
+            if (temp->etaEnd.hrs < newBucket->etaStart.hrs)
+            {
+                prev = temp;
+                temp = temp->next;
+            }
+            else
+            {
+                flag = 0;
+            }
+        }
+        if (flag && !temp)
+        {
+            newBucket->next = temp;
+            prev->next = newBucket;
+        }
+        else if (temp)
+        {
+            prev->next = newBucket;
+            newBucket->next = temp;
+        }
     }
-    
-    bucketList->BucketHeight = 1 + max(bucketTreeHeight(bucketList->left), bucketTreeHeight(bucketList->right));
-
-    int balanceOfBucket = balanceBucket(bucketList);
-
-    if (balanceOfBucket > 1 && maxTime(bucketList->left->etaEnd, newBucket->etaEnd) == 1)
-    {
-        return rightRotateBucket(bucketList);
-    }
-    else if (balanceOfBucket > 1 && maxTime(bucketList->left->etaEnd, newBucket->etaEnd) == -1)
-    {
-        bucketList->left = leftRotateBucket(bucketList->left);
-        return rightRotateBucket(bucketList);
-    }
-    else if (balanceOfBucket < -1 && maxTime(bucketList->right->etaEnd, newBucket->etaEnd) == 1)
-    {
-        bucketList->right = rightRotateBucket(bucketList->right);
-        return leftRotateBucket(bucketList);
-    }
-    else if (balanceOfBucket < -1 && maxTime(bucketList->right->etaEnd, newBucket->etaEnd) == -1)
-    {
-        return leftRotateBucket(bucketList);
-    }
-
     return bucketList;
 }
-
-AVLFlightSchedule *leftRotateFlightSchedule(AVLFlightSchedule *flightSchedule)
+void insertFlightPlan(Bucket **bucketList, int flightId, Time departTime, Time ETA)
 {
-    AVLFlightSchedule *flightScheduleRight = flightSchedule->right;
-    AVLFlightSchedule *flightScheduleRightLeft = flightScheduleRight->left;
-
-    flightScheduleRight->left = flightSchedule;
-    flightSchedule->right = flightScheduleRightLeft;
-
-    flightSchedule->FlightHeight = max(flightTreeHegiht(flightSchedule->left), flightTreeHegiht(flightSchedule->right)) + 1;
-    flightScheduleRight->FlightHeight = max(flightTreeHegiht(flightScheduleRight->left), flightTreeHegiht(flightScheduleRight->right)) + 1;
-
-    return flightScheduleRight;
-}
-
-AVLFlightSchedule *rightRotateFlightSchedule(AVLFlightSchedule *flightSchedule)
-{
-    AVLFlightSchedule *flightScheduleLeft = flightSchedule->left;
-    AVLFlightSchedule *flightScheduleLeftRight = flightScheduleLeft->right;
-
-    flightScheduleLeft->right = flightSchedule;
-    flightSchedule->left = flightScheduleLeftRight;
-
-    flightSchedule->FlightHeight = max(flightTreeHegiht(flightSchedule->left), flightTreeHegiht(flightSchedule->right)) + 1;
-    flightScheduleLeft->FlightHeight = max(flightTreeHegiht(flightScheduleLeft->left), flightTreeHegiht(flightScheduleLeft->right)) + 1;
-
-    return flightScheduleLeft;
-}
-
-int balanceFlight(AVLFlightSchedule *flightSchedule)
-{
-    int ans = 0;
-    if (flightSchedule != NULL)
-    {
-        ans = flightTreeHegiht(flightSchedule->left) - flightTreeHegiht(flightSchedule->right);
-    }
-    return ans;
-}
-
-int liesBetween(Time etaStart, Time etaEnd, Time givenETA)
-{
-    int ret_val = 0;
-    if (timeDiff(givenETA, etaStart) >= 0 && timeDiff(givenETA, etaStart) < 60 && timeDiff(etaEnd, givenETA) >= 0 && timeDiff(etaEnd, givenETA) < 60)
-    {
-        ret_val = 0;
-    }
-    else if (timeDiff(givenETA, etaStart) < 0)
-    {
-        ret_val = -1;
-    }
-    else if (timeDiff(givenETA, etaEnd) > 0)
-    {
-        ret_val = 1;
-    }
-    return ret_val;
-}
-AVLBucket *checkWhetherBucketExists(AVLBucket *bucketList, AVLFlightSchedule *newflight)
-{
-    AVLBucket *Bptr = NULL;
-    if (bucketList != NULL)
-    {
-        if (liesBetween(bucketList->etaStart, bucketList->etaEnd, newflight->ETA) == -1)
-        { // left
-            Bptr = checkWhetherBucketExists(bucketList->left, newflight);
-        }
-        else if (liesBetween(bucketList->etaStart, bucketList->etaEnd, newflight->ETA) == 1)
-        { // right
-            Bptr = checkWhetherBucketExists(bucketList->right, newflight);
-        }
-        else if (liesBetween(bucketList->etaStart, bucketList->etaEnd, newflight->ETA) == 0)
-        {// found
-            Bptr = bucketList;
-        }
-    }
-    return Bptr;
-}
-
-AVLFlightSchedule *insertFlightIntoBucket(AVLFlightSchedule *flightList, AVLFlightSchedule *newflight)
-{
-    if (flightList == NULL)
-    {
-        return newflight;
-    }
-
-    if (maxTime(flightList->departureTime, newflight->departureTime) == 1)
-    {
-        flightList->left = insertFlightIntoBucket(flightList->left, newflight);
-    }
-    else if (maxTime(flightList->departureTime, newflight->departureTime) == -1)
-    {
-        flightList->right = insertFlightIntoBucket(flightList->right, newflight);
-    }
-
-    flightList->FlightHeight = 1 + max(flightTreeHegiht(flightList->left), flightTreeHegiht(flightList->right));
-
-    int balanceOfFlight = balanceFlight(flightList);
-
-    if (balanceOfFlight > 1 && maxTime(flightList->left->departureTime, newflight->departureTime) == 1)
-    {
-        return rightRotateFlightSchedule(flightList);
-    }
-    if (balanceOfFlight > 1 && maxTime(flightList->left->departureTime, newflight->departureTime) == -1)
-    {
-        flightList->left = leftRotateFlightSchedule(flightList->left);
-        return rightRotateFlightSchedule(flightList);
-    }
-    if (balanceOfFlight < -1 && maxTime(flightList->right->departureTime, newflight->departureTime) == 1)
-    {
-        flightList->right = rightRotateFlightSchedule(flightList->right);
-        return leftRotateFlightSchedule(flightList);
-    }
-    if (balanceOfFlight < -1 && maxTime(flightList->right->departureTime, newflight->departureTime) == -1)
-    {
-        return leftRotateFlightSchedule(flightList);
-    }
-    return flightList;
-}
-void insertFlightPlan(AVLBucket **bucketList, int flightId, Time departureTime, Time ETA)
-{
-    AVLFlightSchedule *newFlight = createFlightSchedule(flightId, departureTime, ETA);
-
+    FlightSchedule *newSchedule = createFlightSchedule(flightId, departTime, ETA);
     if (*bucketList == NULL)
     {
-        printf("New bucket added with bucketID %d\n", BucketIDStart);
         Time etaS, etaE;
         etaS.hrs = ETA.hrs;
         etaS.min = 0;
         etaE.hrs = ETA.hrs;
         etaE.min = 59;
-        AVLBucket *newBucket = createBucket(BucketIDStart++, etaS, etaE);
-        *bucketList = newBucket;
-        (*bucketList)->FlightSchedule = newFlight;
+        Bucket *newBucket = createBucket(BucketIDStart++, etaS, etaE);
+        *bucketList = insertBucket(*bucketList, newBucket);
+        (*bucketList)->flightSchedule = newSchedule;
     }
-
     else
     {
-        AVLBucket *bucketExists = checkWhetherBucketExists(*bucketList, newFlight);
-
-        if (bucketExists != NULL)
+        Bucket *temp = *bucketList;
+        Bucket *prev;
+        int flag = 1;
+        while (temp && flag)
         {
-            AVLFlightSchedule *flightList = bucketExists->FlightSchedule;
-            bucketExists->FlightSchedule = insertFlightIntoBucket(flightList, newFlight);
+            if (liesBetween(temp->etaStart, temp->etaEnd, ETA))
+                flag = 0;
+            else
+            {
+                prev = temp;
+                temp = temp->next;
+            }
         }
-        else
+
+        if (flag == 1)
         {
             printf("New bucket added with bucketID %d\n", BucketIDStart);
             Time etaS, etaE;
@@ -401,161 +220,224 @@ void insertFlightPlan(AVLBucket **bucketList, int flightId, Time departureTime, 
             etaS.min = 0;
             etaE.hrs = ETA.hrs;
             etaE.min = 59;
-            AVLBucket *newBucket = createBucket(BucketIDStart++, etaS, etaE);
-            newBucket->FlightSchedule = newFlight;
+            Bucket *newBucket = createBucket(BucketIDStart++, etaS, etaE);
+            newBucket->flightSchedule = newSchedule;
             *bucketList = insertBucket(*bucketList, newBucket);
         }
-    }
-}
 
-AVLFlightSchedule *inorderSuccessor(AVLFlightSchedule *flightSchedule) {
-    AVLFlightSchedule *temp = flightSchedule;
-    while (temp->left != NULL) {
-        temp = temp->left;
-    }
-    return temp;
-}
-
-AVLBucket* searchFlightToDelete(AVLBucket * bucket, AVLFlightSchedule* flightList, int flightId, Time departureTime) {
-    AVLBucket *Bptr = NULL;
-    if (flightList != NULL) {
-        if (flightList->flightId == flightId) {
-            Bptr = bucket;
-        } 
-        else if (maxTime(departureTime, flightList->departureTime) == -1) {
-            Bptr = searchFlightToDelete(bucket, flightList->left, flightId, departureTime);
-        } 
-        else if (maxTime(departureTime, flightList->departureTime) == 1) {
-            Bptr = searchFlightToDelete(bucket, flightList->right, flightId, departureTime);
-        }
-    }
-    return Bptr;
-}
-
-AVLFlightSchedule *deleteHelper(AVLFlightSchedule *flightSchedule, int flightId, Time DepartureTime) {
-    if (flightSchedule == NULL) return NULL;
-
-    if (flightSchedule->flightId == flightId && maxTime(flightSchedule->departureTime, DepartureTime) == 0) {
-        // 0 child
-        if (flightSchedule->left == NULL && flightSchedule->right == NULL) {
-            free(flightSchedule);
-            return NULL;
-        }
-        // 1 child   
-        if(flightSchedule->right == NULL && flightSchedule->left != NULL) {
-            AVLFlightSchedule* temp = flightSchedule->left;
-            free(flightSchedule);
-            return temp;
-        }
-        if(flightSchedule->left == NULL && flightSchedule->right != NULL){
-            AVLFlightSchedule* temp = flightSchedule->right;
-            free(flightSchedule);
-            return temp;
-        }
-        else {
-            AVLFlightSchedule *successor = inorderSuccessor(flightSchedule->right);
-            flightSchedule->flightId = successor->flightId;
-            flightSchedule->departureTime = successor->departureTime;
-            flightSchedule->ETA = successor->ETA;
-            flightSchedule->right = deleteHelper(flightSchedule->right, successor->flightId, successor->departureTime);
-        }
-    } 
-    else if (maxTime(flightSchedule->departureTime, DepartureTime) == 1) {
-        flightSchedule->left = deleteHelper(flightSchedule->left, flightId, DepartureTime);
-    }
-    else if (maxTime(flightSchedule->departureTime, DepartureTime) == -1) {
-        flightSchedule->right = deleteHelper(flightSchedule->right, flightId, DepartureTime);
-    }
-
-    if (flightSchedule != NULL) {
-        flightSchedule->FlightHeight = 1 + max(flightTreeHegiht(flightSchedule->left), flightTreeHegiht(flightSchedule->right));
-        int balanceOfFlight = balanceFlight(flightSchedule);
-
-        if (balanceOfFlight > 1 && balanceFlight(flightSchedule->left) >= 0) {
-            return rightRotateFlightSchedule(flightSchedule);
-        }
-        if (balanceOfFlight > 1 && balanceFlight(flightSchedule->left) < 0) {
-            flightSchedule->left = leftRotateFlightSchedule(flightSchedule->left);
-            return rightRotateFlightSchedule(flightSchedule);
-        }
-        if (balanceOfFlight < -1 && balanceFlight(flightSchedule->right) <= 0) {
-            return leftRotateFlightSchedule(flightSchedule);
-        }
-        if (balanceOfFlight < -1 && balanceFlight(flightSchedule->right) > 0) {
-            flightSchedule->right = rightRotateFlightSchedule(flightSchedule->right);
-            return leftRotateFlightSchedule(flightSchedule);
-        }
-    }
-    return flightSchedule;
-}
-
-AVLBucket* deleteFlightPlan(AVLBucket *bucketList, int flightId, Time DepartureTime) {
-    if (bucketList == NULL) return NULL;
-
-    bucketList->left = deleteFlightPlan(bucketList->left, flightId, DepartureTime);
-    bucketList->right = deleteFlightPlan(bucketList->right, flightId, DepartureTime);
-
-    AVLBucket* bucketContains = searchFlightToDelete(bucketList, bucketList->FlightSchedule, flightId, DepartureTime);
-    if (bucketContains != NULL) {
-        AVLFlightSchedule* flightList = deleteHelper(bucketContains->FlightSchedule, flightId, DepartureTime);
-        bucketContains->FlightSchedule = flightList;
-        return bucketList;
-    }
-    return bucketList;
-}
-
-AVLFlightSchedule* appendFlight(AVLFlightSchedule* flightList, AVLFlightSchedule* flightPlan){
-    if(flightList == NULL) return flightPlan;
-
-    else if(flightList->flightId > flightPlan->flightId){
-        flightList->left = appendFlight(flightList->left, flightPlan);
-    }
-
-    else if(flightList->flightId < flightPlan->flightId){
-        flightList->right = appendFlight(flightList->right, flightPlan);
-    }
-
-    return flightList;
-}
-
-void searchFlightInRange(AVLFlightSchedule* flight, Time startTime, Time endTime, AVLFlightSchedule** sortted)
-{   
-    if (flight != NULL)
-    {
-        if (maxTime(flight->departureTime, startTime) == 1 && maxTime(endTime, flight->departureTime) == 1)
+        else
         {
-           *sortted = appendFlight(*sortted, flight);
+            if (temp->flightSchedule == NULL)
+            {
+                temp->flightSchedule = newSchedule;
+            }
+            else if (maxTime(newSchedule->departureTime, temp->flightSchedule->departureTime) < 0)
+            {
+                newSchedule->next = temp->flightSchedule;
+                temp->flightSchedule = newSchedule;
+            }
+            else
+            {
+                FlightSchedule *prev = temp->flightSchedule;
+                FlightSchedule *curr = temp->flightSchedule;
+                while (curr && maxTime(newSchedule->departureTime, curr->departureTime) >= 0)
+                {
+                    prev = curr;
+                    curr = curr->next;
+                }
+                prev->next = newSchedule;
+                newSchedule->next = curr;
+            }
         }
-        searchFlightInRange(flight->left, startTime, endTime, sortted);
-        searchFlightInRange(flight->right, startTime, endTime, sortted);
-    }   
-                                                                              
-}
-
-void inorder(AVLFlightSchedule* flight){
-    if(flight!= NULL){
-        inorder(flight->left);
-        printf("%d\n", flight->flightId);
-        printf("Departure time: %d:%d\n", flight->departureTime.hrs, flight->departureTime.min);
-        printf("ETA: %d:%d\n", flight->ETA.hrs, flight->ETA.min);
-        inorder(flight->right);
     }
+    return;
 }
-
-void showFlightInRange(AVLBucket* bucketList, Time startTime, Time endTime, AVLFlightSchedule** sorted)
+void deleteFlightPlan(Bucket **bucketList, int flightId)
 {
-    if (bucketList != NULL)
+    Bucket *temp = *bucketList;
+    int flag = 1;
+    while (temp && flag)
     {
-        showFlightInRange(bucketList->left, startTime, endTime, sorted);
-        searchFlightInRange(bucketList->FlightSchedule, startTime, endTime, sorted);
-        showFlightInRange(bucketList->right, startTime, endTime, sorted);
+        FlightSchedule *curr = temp->flightSchedule;
+        if (curr && curr->flightId == flightId)
+        {
+            flag = 0;
+            FlightSchedule *ptr = curr;
+            temp->flightSchedule = curr->next;
+            free(ptr);
+        }
+        else
+        {
+            FlightSchedule *prev = temp->flightSchedule;
+            while (curr && flag)
+            {
+                if (curr->flightId == flightId)
+                {
+                    flag = 0;
+                    FlightSchedule *ptr = curr;
+                    prev->next = curr->next;
+                    free(ptr);
+                }
+                else
+                {
+                    prev = curr;
+                    curr = curr->next;
+                }
+            }
+        }
+        temp = temp->next;
     }
+    if (flag == 1)
+    {
+        printf("Flight Id %d does not exist\n", flightId);
+    }
+    printf("\n");
+    return;
 }
 
-void Qf(AVLBucket *bucketList, Time startTime, Time endTime){
-    AVLFlightSchedule* sorted = NULL ;
-    showFlightInRange(bucketList, startTime, endTime, &sorted);
-    inorder(sorted);
+FlightSchedule *mergeSortedLists(FlightSchedule *l1, FlightSchedule *l2)
+{
+    Time notTime;
+    notTime.hrs = -1;
+    notTime.min = -1;
+    FlightSchedule *dummy = createFlightSchedule(-1, notTime, notTime);
+    FlightSchedule *current = dummy;
+
+    while (l1 != NULL && l2 != NULL)
+    {
+        if (l1->departureTime.hrs < l2->departureTime.hrs)
+        {
+            current->next = l1;
+            l1 = l1->next;
+        }
+        else if (l1->departureTime.hrs == l2->departureTime.hrs)
+        {
+            if (l1->departureTime.min < l2->departureTime.min)
+            {
+                current->next = l1;
+                l1 = l1->next;
+            }
+            else
+            {
+                current->next = l2;
+                l2 = l2->next;
+            }
+        }
+        else
+        {
+            current->next = l2;
+            l2 = l2->next;
+        }
+        current = current->next;
+    }
+
+    // If one of the lists is longer than the other or if either of the list is empty
+    if (l1 != NULL)
+    {
+        current->next = l1;
+    }
+    else
+    {
+        current->next = l2;
+    }
+    FlightSchedule *ans = dummy->next;
+    free(dummy);
+    return ans;
+}
+
+void reArrangeBucket(Bucket **bucket, Time t)
+{
+    Time notTime;
+    notTime.hrs = -1;
+    notTime.min = -1;
+    Bucket *tempBucket = createBucket(-1, notTime, notTime);
+    Bucket *curr = *bucket;
+    Bucket *prev = NULL;
+    Bucket *start;
+    Bucket *n;
+
+    if (t.hrs == 0 && t.min == 0)
+    {
+        printf("!! Original Time Interval !!\n");
+    }
+    else
+    {
+        while (curr)
+        {
+            curr->etaStart.min = t.min;
+            curr->etaEnd.hrs = (curr->etaEnd.hrs + 1) % 24;
+            curr->etaEnd.min = t.min - 1;
+            FlightSchedule *temp = curr->flightSchedule;
+            FlightSchedule *dummy = createFlightSchedule(-11, notTime, notTime);
+            FlightSchedule *dummyTail = dummy;
+            FlightSchedule *store = createFlightSchedule(-1, notTime, notTime), *storeTail = store;
+            while (temp)
+            {
+                FlightSchedule *next = temp->next;
+                if (temp->eta.min >= t.min)
+                {
+                    dummyTail->next = temp;
+                    dummyTail = dummyTail->next;
+                }
+                else
+                {
+                    if (storeTail == NULL)
+                    {
+                        storeTail = temp;
+                        store = storeTail;
+                    }
+                    else
+                    {
+                        storeTail->next = temp;
+                        storeTail = storeTail->next;
+                    }
+                }
+                temp->next = NULL;
+                temp = next;
+            }
+            // adding data to previous bucket
+            curr->flightSchedule = NULL;
+            curr->flightSchedule = dummy->next;
+            if (prev == NULL)
+            {
+                tempBucket->flightSchedule = store->next;
+            }
+            else
+            {
+                FlightSchedule *l1 = prev->flightSchedule;
+                FlightSchedule *l2 = store->next;
+                prev->flightSchedule = mergeSortedLists(l1, l2);
+            }
+            if (curr->next == NULL)
+            {
+                FlightSchedule *l1 = curr->flightSchedule;
+                FlightSchedule *l2 = tempBucket->flightSchedule;
+                curr->flightSchedule = mergeSortedLists(l1, l2);
+            }
+            prev = curr;
+            curr = curr->next;
+        }
+        // changing *bucket
+        Bucket *Start = *bucket;
+        Bucket *current = *bucket;
+        Bucket *previous = NULL;
+        if (t.hrs != 0)
+        {
+            while (current->etaStart.hrs < t.hrs)
+            {
+                previous = current;
+                current = current->next;
+            }
+            *bucket = current;
+            previous->next = NULL;
+            current = (*bucket)->next;
+            while (current->next)
+            {
+                current = current->next;
+            }
+            current->next = Start;
+        }
+    }
 }
 
 void printMenu()
@@ -563,12 +445,14 @@ void printMenu()
     printf("1. Add a new flight\n");
     printf("2. Delete a flight\n");
     printf("3. Show Status\n");
-    printf("4. Show Flight in Range \n");
+    printf("4. Rearrange \n");
     printf("5. Exit\n");
 }
+
 int main()
 {
-    AVLBucket *bucketList = NULL;
+
+    Bucket *bucketList = NULL;
     int flightId;
     Time departTime;
     Time ETA;
@@ -588,10 +472,9 @@ int main()
             insertFlightPlan(&bucketList, flightId, departTime, ETA);
         }
     }
-    fclose(fptr);
     Print(bucketList);
-    printf("--------------------------------\n");
-    int choice ;
+    fclose(fptr);
+    int choice;
     while (1)
     {
         printMenu();
@@ -613,26 +496,25 @@ int main()
         case 2:
             printf("Enter the Flight Id (100 to 340 already exists)\n");
             scanf("%d", &flightId);
-            printf("Enter Departure Time (hrs min)\n");
-            scanf("%d %d", &departTime.hrs, &departTime.min);
-            bucketList = deleteFlightPlan(bucketList, flightId, departTime);
-            if(bucketList == NULL)  printf("Failed to delete") ;
-            else Print(bucketList);
+            deleteFlightPlan(&bucketList, flightId);
+            Print(bucketList);
             break;
         case 3:
             printf("Enter the Flight Id (100 to 340 only)\n");
             scanf("%d", &flightId);
             printf("\n");
-            int a = showStatus(bucketList, flightId);
-            if(a == 0) printf("Flight with flightId %d not found\n", flightId);
-            printf("\n");
+            showStatus(bucketList, flightId);
             break;
         case 4:
-            printf("Enter starting time hours and minutes\n");
+            printf("Enter current time hours and minutes\n");
             scanf("%d %d", &currTime.hrs, &currTime.min);
-            printf("Enter ending time hours and minutes\n") ;
-            scanf("%d %d", &departTime.hrs, &departTime.min);
-            Qf(bucketList, currTime, departTime);
+            if(currTime.hrs == 0 && currTime.min == 0){
+                printf("!! Original Time Interval!!\n\n");
+            }
+            else{
+                reArrangeBucket(&bucketList, currTime);
+                Print(bucketList);
+            }
             break;
         case 5:
             printf("..Happy Hacking..\n");
@@ -642,6 +524,6 @@ int main()
             break;
         }
     }
-    
+
     return 0;
 }
